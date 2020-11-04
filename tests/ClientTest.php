@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Webclient\Tests\Fake;
 
 use Webclient\Fake\Client;
+use Webclient\Stuff\Fake\Factory\HttpFactory;
 use Webclient\Stuff\Fake\Handler\ErrorHandler;
 use Webclient\Stuff\Fake\Handler\UniversalHandler;
-use Nyholm\Psr7\Factory\Psr17Factory;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\NetworkExceptionInterface;
@@ -16,21 +16,16 @@ class ClientTest extends TestCase
 {
 
     /**
-     * @var Psr17Factory
+     * @var HttpFactory
      */
     private $factory;
-
-    public function setUp()
-    {
-        parent::setUp();
-        $this->factory = new Psr17Factory();
-    }
 
     /**
      * @throws ClientExceptionInterface
      */
     public function testSuccessWithRequest()
     {
+        $this->init();
         $request = $this->factory->createRequest('GET', 'http://phpunit.de/?return=302&redirect=https://phpunit.de');
         $client = new Client(new UniversalHandler($this->factory));
         $response = $client->sendRequest($request);
@@ -44,6 +39,7 @@ class ClientTest extends TestCase
      */
     public function testSuccessWithServerRequest()
     {
+        $this->init();
         $request = $this->factory->createServerRequest(
             'GET',
             'https://phpunit.de',
@@ -64,6 +60,7 @@ class ClientTest extends TestCase
      */
     public function testSuccessWithPreparedServerRequest()
     {
+        $this->init();
         $request = $this->factory->createServerRequest(
             'GET',
             'https://phpunit.de',
@@ -83,9 +80,15 @@ class ClientTest extends TestCase
      */
     public function testFailWithNetworkError()
     {
+        $this->init();
         $request = $this->factory->createRequest('GET', '/');
         $client = new Client(new ErrorHandler());
         $this->expectException(NetworkExceptionInterface::class);
         $client->sendRequest($request);
+    }
+
+    private function init()
+    {
+        $this->factory = new HttpFactory();
     }
 }
