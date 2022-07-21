@@ -9,82 +9,21 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\StreamInterface;
 use Psr\Http\Message\UriInterface;
 
-use function array_slice;
-use function array_key_exists;
-use function array_map;
-use function base64_decode;
-use function explode;
-use function http_build_query;
-use function implode;
-use function is_array;
-use function is_null;
-use function is_object;
-use function ltrim;
-use function parse_str;
-use function preg_match;
-use function preg_replace_callback;
-use function rtrim;
-use function strtolower;
-use function strtoupper;
-use function trim;
-
 final class ServerRequest implements ServerRequestInterface
 {
+    private StreamInterface $body;
+    private UriInterface $uri;
+    private string $protocolVersion;
+    private string $method;
+    private string $target;
+    private array $server;
+    private array $attributes = [];
+    private array $query = [];
+    private array $cookies = [];
+    private array $files = [];
+    /** @var string[][] */
+    private array $headers = [];
 
-    /**
-     * @var StreamInterface
-     */
-    private $body;
-
-    /**
-     * @var UriInterface
-     */
-    private $uri;
-
-    /**
-     * @var string
-     */
-    private $protocolVersion;
-
-    /**
-     * @var string
-     */
-    private $method;
-
-    /**
-     * @var string
-     */
-    private $target;
-
-    /**
-     * @var array
-     */
-    private $server;
-
-    /**
-     * @var string[][]
-     */
-    private $headers = [];
-
-    /**
-     * @var array
-     */
-    private $attributes = [];
-
-    /**
-     * @var array
-     */
-    private $query = [];
-
-    /**
-     * @var array
-     */
-    private $cookies = [];
-
-    /**
-     * @var array
-     */
-    private $files = [];
 
     /**
      * @var null|array|object
@@ -163,11 +102,17 @@ final class ServerRequest implements ServerRequestInterface
         }
     }
 
-    public function getProtocolVersion()
+    /**
+     * @inheritDoc
+     */
+    public function getProtocolVersion(): string
     {
         return $this->protocolVersion;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function withProtocolVersion($version)
     {
         $valid = ['1.0', '1.1', '2.0', '2'];
@@ -179,28 +124,43 @@ final class ServerRequest implements ServerRequestInterface
         return $that;
     }
 
-    public function getHeaders()
+    /**
+     * @inheritDoc
+     */
+    public function getHeaders(): array
     {
         return $this->headers;
     }
 
-    public function hasHeader($name)
+    /**
+     * @inheritDoc
+     */
+    public function hasHeader($name): bool
     {
         $name = $this->normalizeHeaderName($name);
         return array_key_exists($name, $this->headers);
     }
 
-    public function getHeader($name)
+    /**
+     * @inheritDoc
+     */
+    public function getHeader($name): array
     {
         $name = $this->normalizeHeaderName($name);
         return array_key_exists($name, $this->headers) ? $this->headers[$name] : [];
     }
 
-    public function getHeaderLine($name)
+    /**
+     * @inheritDoc
+     */
+    public function getHeaderLine($name): string
     {
         return implode(',', $this->getHeader($name));
     }
 
+    /**
+     * @inheritDoc
+     */
     public function withHeader($name, $value)
     {
         $headers = $this->headers;
@@ -210,6 +170,9 @@ final class ServerRequest implements ServerRequestInterface
         return $that;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function withAddedHeader($name, $value)
     {
         $header = $this->getHeader($name);
@@ -221,6 +184,9 @@ final class ServerRequest implements ServerRequestInterface
         return $this->withHeader($name, $header);
     }
 
+    /**
+     * @inheritDoc
+     */
     public function withoutHeader($name)
     {
         $headers = $this->headers;
@@ -233,11 +199,17 @@ final class ServerRequest implements ServerRequestInterface
         return $that;
     }
 
-    public function getBody()
+    /**
+     * @inheritDoc
+     */
+    public function getBody(): StreamInterface
     {
         return $this->body;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function withBody(StreamInterface $body)
     {
         $that = clone $this;
@@ -245,11 +217,17 @@ final class ServerRequest implements ServerRequestInterface
         return $that;
     }
 
-    public function getRequestTarget()
+    /**
+     * @inheritDoc
+     */
+    public function getRequestTarget(): string
     {
         return $this->target;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function withRequestTarget($requestTarget)
     {
         $that = clone $this;
@@ -257,11 +235,17 @@ final class ServerRequest implements ServerRequestInterface
         return $that;
     }
 
-    public function getMethod()
+    /**
+     * @inheritDoc
+     */
+    public function getMethod(): string
     {
         return $this->method;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function withMethod($method)
     {
         $that = clone $this;
@@ -269,11 +253,17 @@ final class ServerRequest implements ServerRequestInterface
         return $that;
     }
 
-    public function getUri()
+    /**
+     * @inheritDoc
+     */
+    public function getUri(): UriInterface
     {
         return $this->uri;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function withUri(UriInterface $uri, $preserveHost = false)
     {
         $that = clone $this;
@@ -291,16 +281,25 @@ final class ServerRequest implements ServerRequestInterface
         return $that;
     }
 
-    public function getServerParams()
+    /**
+     * @inheritDoc
+     */
+    public function getServerParams(): array
     {
         return $this->server;
     }
 
-    public function getCookieParams()
+    /**
+     * @inheritDoc
+     */
+    public function getCookieParams(): array
     {
         return $this->cookies;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function withCookieParams(array $cookies)
     {
         $that = clone $this;
@@ -308,11 +307,17 @@ final class ServerRequest implements ServerRequestInterface
         return $that;
     }
 
-    public function getQueryParams()
+    /**
+     * @inheritDoc
+     */
+    public function getQueryParams(): array
     {
         return $this->query;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function withQueryParams(array $query)
     {
         $that = clone $this;
@@ -320,11 +325,17 @@ final class ServerRequest implements ServerRequestInterface
         return $that;
     }
 
-    public function getUploadedFiles()
+    /**
+     * @inheritDoc
+     */
+    public function getUploadedFiles(): array
     {
         return $this->files;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function withUploadedFiles(array $uploadedFiles)
     {
         $that = clone $this;
@@ -332,11 +343,17 @@ final class ServerRequest implements ServerRequestInterface
         return $that;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function getParsedBody()
     {
         return $this->parsedBody;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function withParsedBody($data)
     {
         if (!is_null($data) && !is_object($data) && !is_array($data)) {
@@ -347,16 +364,25 @@ final class ServerRequest implements ServerRequestInterface
         return $that;
     }
 
-    public function getAttributes()
+    /**
+     * @inheritDoc
+     */
+    public function getAttributes(): array
     {
         return $this->attributes;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function getAttribute($name, $default = null)
     {
         return array_key_exists($name, $this->attributes) ? $this->attributes[$name] : $default;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function withAttribute($name, $value)
     {
         $that = clone $this;
@@ -364,6 +390,9 @@ final class ServerRequest implements ServerRequestInterface
         return $that;
     }
 
+    /**
+     * @inheritDoc
+     */
     public function withoutAttribute($name)
     {
         $that = clone $this;
@@ -399,7 +428,7 @@ final class ServerRequest implements ServerRequestInterface
                 if (count($parts) >= 2) {
                     $contentType = 'application/' . $parts[count($parts) - 1];
                 }
-                $this->parseBody($contentType, $contents, false);
+                $this->parseBody($contentType, $contents);
                 break;
         }
         if ($parsedBody) {
@@ -418,16 +447,16 @@ final class ServerRequest implements ServerRequestInterface
         $this->body = new Stream(http_build_query((array)$this->parsedBody));
     }
 
-    private function parsePart(string $contents): bool
+    private function parsePart(string $contents): void
     {
         $data = explode("\r\n\r\n", $contents, 2);
         $header = trim($data[0]);
         if (!$header || !array_key_exists(1, $data)) {
-            return false;
+            return;
         }
         $body = trim($data[1]);
         if (!$body) {
-            return false;
+            return;
         }
         $headers = [];
         foreach (explode("\r\n", $header) as $line) {
@@ -461,7 +490,7 @@ final class ServerRequest implements ServerRequestInterface
             || !array_key_exists('name', $headers['content-disposition']['attr'])
             || !$headers['content-disposition']['attr']['name']
         ) {
-            return false;
+            return;
         }
         $disposition = $headers['content-disposition'];
         $name = $disposition['attr']['name'];
@@ -473,19 +502,17 @@ final class ServerRequest implements ServerRequestInterface
             if (is_array($this->parsedBody)) {
                 $this->setField($this->parsedBody, $name, $body);
             }
-            return true;
-        } else {
-            $mime = 'application/octet-stream';
-            if (array_key_exists('content-type', $headers) && array_key_exists(0, $headers['content-type']['values'])) {
-                $mime = $headers['content-type']['values'][0];
-            }
-            $file = $this->parseFile($filename, $mime, $body);
-            $this->setField($this->files, $name, $file);
+            return;
         }
-        return false;
+        $mime = 'application/octet-stream';
+        if (array_key_exists('content-type', $headers) && array_key_exists(0, $headers['content-type']['values'])) {
+            $mime = $headers['content-type']['values'][0];
+        }
+        $file = $this->parseFile($filename, $mime, $body);
+        $this->setField($this->files, $name, $file);
     }
 
-    private function parseFile($filename, $contentType, $contents)
+    private function parseFile($filename, $contentType, $contents): UploadedFile
     {
         $error = UPLOAD_ERR_OK;
         if (!$contents && $filename === '') {

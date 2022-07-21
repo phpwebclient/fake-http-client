@@ -14,20 +14,12 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 use Throwable;
 
-final class Client implements ClientInterface
+final class FakeHttpClient implements ClientInterface
 {
+    public const NO_REPLACE_ATTRIBUTE = 'webclient-fake-http-client-request-no-replace';
 
-    const NO_REPLACE_ATTRIBUTE = 'webclient-fake-http-client-request-no-replace';
-
-    /**
-     * @var RequestHandlerInterface
-     */
-    private $handler;
-
-    /**
-     * @var array
-     */
-    private $server;
+    private RequestHandlerInterface $handler;
+    private array $server;
 
     public function __construct(RequestHandlerInterface $handler, array $server = [])
     {

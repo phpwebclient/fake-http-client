@@ -12,7 +12,7 @@ Mock for PSR-18 HTTP client
 Add package to project
 
 ```bash
-composer require --dev webclient/fake-http-client:^1.0
+composer require --dev webclient/fake-http-client:^2.0
 ```
 
 Set autoload
@@ -28,7 +28,7 @@ include 'vendor/autoload.php';
 ```php
 <?php
 
-use Webclient\Fake\Client;
+use Webclient\Fake\FakeHttpClient;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 
@@ -36,7 +36,7 @@ use Psr\Http\Server\RequestHandlerInterface;
  * @var RequestHandlerInterface $handler your mock handler 
  * @var RequestInterface $request your tested request
  */
-$client = new Client($handler);
+$client = new FakeHttpClient($handler);
 
 $response = $client->sendRequest($request);
 ```
@@ -48,7 +48,7 @@ This package provides simple routing.
 ```php
 <?php
 
-use Webclient\Fake\Client;
+use Webclient\Fake\FakeHttpClient;
 use Webclient\Fake\Handler\SimpleRoutingHandler;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
@@ -70,7 +70,7 @@ $handler
     ->route(['POST'], '/entities', $entityCreatedHandler)
     ->route(['DELETED'], '/entities/2', $entityDeletedHandler)
 ;
-$client = new Client($handler);
+$client = new FakeHttpClient($handler);
 
 $response1 = $client->sendRequest($errorRequest); // returns error 404
 $response2 = $client->sendRequest($entityCreatingRequest); // returns success response 201
@@ -86,7 +86,7 @@ If you pass the `\Psr\Http\Message\ServerRequestInterface` object to client and 
 ```php
 <?php
 
-use Webclient\Fake\Client;
+use Webclient\Fake\FakeHttpClient;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 
@@ -94,7 +94,7 @@ use Psr\Http\Server\RequestHandlerInterface;
  * @var RequestHandlerInterface $handler your mock handler 
  * @var ServerRequestInterface $request your tested request
  */
-$client = new Client($handler);
+$client = new FakeHttpClient($handler);
 
-$response = $client->sendRequest($request->withAttribute(Client::NO_REPLACE_ATTRIBUTE, true));
+$response = $client->sendRequest($request->withAttribute(FakeHttpClient::NO_REPLACE_ATTRIBUTE, true));
 ```

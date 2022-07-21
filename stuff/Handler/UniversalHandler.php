@@ -12,11 +12,7 @@ use Psr\Http\Server\RequestHandlerInterface;
 
 class UniversalHandler implements RequestHandlerInterface
 {
-
-    /**
-     * @var ResponseFactoryInterface
-     */
-    private $responseFactory;
+    private ResponseFactoryInterface $responseFactory;
 
     public function __construct(ResponseFactoryInterface $responseFactory)
     {

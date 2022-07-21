@@ -10,7 +10,6 @@ use Throwable;
 
 final class Stream implements StreamInterface
 {
-
     /**
      * @var resource|null
      */
@@ -30,7 +29,7 @@ final class Stream implements StreamInterface
         } catch (Throwable $exception) {
             $result = '';
         }
-        return (string)$result;
+        return $result;
     }
 
     public function close()
@@ -41,6 +40,10 @@ final class Stream implements StreamInterface
         $this->detach();
     }
 
+    /**
+     * @inheritDoc
+     * @return resource
+     */
     public function detach()
     {
         $stream = $this->stream;
@@ -48,7 +51,7 @@ final class Stream implements StreamInterface
         return $stream;
     }
 
-    public function getSize()
+    public function getSize(): ?int
     {
         if (!$this->stream) {
             return null;
@@ -62,12 +65,12 @@ final class Stream implements StreamInterface
         return $this->stream ? ftell($this->stream) : false;
     }
 
-    public function eof()
+    public function eof(): bool
     {
-        return $this->stream ? feof($this->stream) : true;
+        return !$this->stream || feof($this->stream);
     }
 
-    public function isSeekable()
+    public function isSeekable(): bool
     {
         return is_resource($this->stream);
     }
@@ -86,12 +89,12 @@ final class Stream implements StreamInterface
         }
     }
 
-    public function isWritable()
+    public function isWritable(): bool
     {
         return is_resource($this->stream);
     }
 
-    public function write($string)
+    public function write($string): int
     {
         $result = $this->stream ? fwrite($this->stream, $string) : false;
         if ($result !== false) {
@@ -100,7 +103,7 @@ final class Stream implements StreamInterface
         throw new RuntimeException('Could not write to stream.');
     }
 
-    public function isReadable()
+    public function isReadable(): bool
     {
         return is_resource($this->stream);
     }
@@ -110,7 +113,7 @@ final class Stream implements StreamInterface
         if (!$this->stream) {
             return false;
         }
-        $data = $data = fread($this->stream, $length);
+        $data = fread($this->stream, $length);
 
         if (is_string($data)) {
             return $data;
@@ -119,12 +122,16 @@ final class Stream implements StreamInterface
         throw new RuntimeException('Could not read from stream.');
     }
 
-    public function getContents()
+    public function getContents(): string
     {
         if (!$this->stream) {
             return '';
         }
-        return stream_get_contents($this->stream);
+        $contents = stream_get_contents($this->stream);
+        if (!is_string($contents)) {
+            throw new RuntimeException('error get stream contents');
+        }
+        return $contents;
     }
 
     public function getMetadata($key = null)

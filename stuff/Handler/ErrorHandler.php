@@ -11,7 +11,6 @@ use Psr\Http\Server\RequestHandlerInterface;
 
 class ErrorHandler implements RequestHandlerInterface
 {
-
     /**
      * @param ServerRequestInterface $request
      * @return ResponseInterface

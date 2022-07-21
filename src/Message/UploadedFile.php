@@ -11,37 +11,17 @@ use RuntimeException;
 
 final class UploadedFile implements UploadedFileInterface
 {
-
-    /**
-     * @var StreamInterface
-     */
-    private $body;
-
-    /**
-     * @var string
-     */
-    private $name;
-
-    /**
-     * @var string
-     */
-    private $type;
-
-    /**
-     * @var int
-     */
-    private $error;
-
-    /**
-     * @var bool;
-     */
-    private $moved = false;
+    private StreamInterface $body;
+    private string $name;
+    private string $type;
+    private int $error;
+    private bool $moved = false;
 
     public function __construct(string $name, string $contents, string $type, int $error)
     {
         $this->name = $name;
         $this->body = new Stream($contents);
-        $this->type = $type ? $type : 'application/octet-stream';
+        $this->type = $type;
         $this->error = $error;
     }
 
@@ -73,22 +53,22 @@ final class UploadedFile implements UploadedFileInterface
         $this->moved = true;
     }
 
-    public function getSize()
+    public function getSize(): ?int
     {
         return $this->body->getSize();
     }
 
-    public function getError()
+    public function getError(): int
     {
         return $this->error;
     }
 
-    public function getClientFilename()
+    public function getClientFilename(): ?string
     {
         return $this->name;
     }
 
-    public function getClientMediaType()
+    public function getClientMediaType(): ?string
     {
         return $this->type;
     }

@@ -10,11 +10,8 @@ use Psr\Http\Server\RequestHandlerInterface;
 
 class SimpleRoutingHandler implements RequestHandlerInterface
 {
-
-    /**
-     * @var RequestHandlerInterface[]
-     */
-    private $handlers = [];
+    /** @var RequestHandlerInterface[] */
+    private array $handlers = [];
 
     public function __construct(RequestHandlerInterface $defaultHandler)
     {

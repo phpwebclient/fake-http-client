@@ -11,11 +11,7 @@ use Throwable;
 
 class NetworkError extends Exception implements NetworkExceptionInterface
 {
-
-    /**
-     * @var RequestInterface
-     */
-    private $request;
+    private RequestInterface $request;
 
     public function __construct(RequestInterface $request, Throwable $previous = null)
     {
