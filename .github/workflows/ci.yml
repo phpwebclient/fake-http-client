@@ -3,10 +3,12 @@ name: CI
 on:
   pull_request:
     branches:
-      - master
+      - 2.x
+      - 3.x
   push:
     branches:
-      - master
+      - 2.x
+      - 3.x
     tags-ignore:
       - v*
 
