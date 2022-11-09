@@ -1,7 +1,7 @@
 [![Latest Stable Version](https://img.shields.io/packagist/v/webclient/fake-http-client.svg?style=flat-square)](https://packagist.org/packages/webclient/fake-http-client)
 [![Total Downloads](https://img.shields.io/packagist/dt/webclient/fake-http-client.svg?style=flat-square)](https://packagist.org/packages/webclient/fake-http-client/stats)
 [![License](https://img.shields.io/packagist/l/webclient/fake-http-client.svg?style=flat-square)](https://github.com/phpwebclient/fake-http-client/blob/master/LICENSE)
-[![PHP](https://img.shields.io/packagist/php-v/webclient/fake-http-client/v1.0.0.svg?style=flat-square)](https://php.net)
+[![PHP](https://img.shields.io/packagist/php-v/webclient/fake-http-client.svg?style=flat-square)](https://php.net)
 
 # webclient/fake-http-client
 
