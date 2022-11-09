@@ -404,9 +404,7 @@ final class ServerRequest implements ServerRequestInterface
 
     private function normalizeHeaderName(string $name): string
     {
-        return preg_replace_callback('/(^|-)[a-z]/u', function (array $matches) {
-            return strtoupper($matches[0]);
-        }, strtolower($name));
+        return mb_convert_case($name, MB_CASE_TITLE);
     }
 
     private function parseBody(string $contentType, string $contents, $allowRecursion = false)
