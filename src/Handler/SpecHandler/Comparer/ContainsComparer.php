@@ -14,6 +14,9 @@ final class ContainsComparer implements ComparerInterface
         if (is_null($pattern) || is_null($actual)) {
             return false;
         }
+        if ($pattern === '') {
+            return true;
+        }
         return strpos($actual, $pattern) !== false;
     }
 }
