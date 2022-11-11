@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Webclient\Tests\Fake;
+namespace Tests\Webclient\Fake\Unit;
 
 use Nyholm\Psr7\Factory\Psr17Factory;
-use Webclient\Fake\FakeHttpClient;
-use Webclient\Stuff\Fake\Handler\ErrorHandler;
-use Webclient\Stuff\Fake\Handler\UniversalHandler;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\NetworkExceptionInterface;
+use Tests\Webclient\Fake\Tools\Handler\ErrorHandler;
+use Tests\Webclient\Fake\Tools\Handler\UniversalHandler;
+use Webclient\Fake\FakeHttpClient;
 
 class FakeHttpClientTest extends TestCase
 {

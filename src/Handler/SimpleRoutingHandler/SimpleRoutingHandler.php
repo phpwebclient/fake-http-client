@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace Webclient\Fake\Handler;
+namespace Webclient\Fake\Handler\SimpleRoutingHandler;
 
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 
-class SimpleRoutingHandler implements RequestHandlerInterface
+final class SimpleRoutingHandler implements RequestHandlerInterface
 {
     /** @var RequestHandlerInterface[] */
     private array $handlers = [];

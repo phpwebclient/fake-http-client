@@ -12,7 +12,7 @@ Mock for PSR-18 HTTP client
 Add package to project
 
 ```bash
-composer require --dev webclient/fake-http-client:^2.0
+composer require --dev webclient/fake-http-client:^3.0
 ```
 
 Set autoload
@@ -40,8 +40,48 @@ $client = new FakeHttpClient($handler);
 
 $response = $client->sendRequest($request);
 ```
+# Handlers
 
-# Routing
+## SpecHandler
+
+This package provides universal handler `\Webclient\Fake\Handler\SpecHandler\SpecHandler` 
+and builder `\Webclient\Fake\Handler\SpecHandler\SpecHandlerBuilder`. 
+With it, you can customize the client for almost any need.
+
+```php
+<?php
+
+use Psr\Http\Message\ResponseInterface;
+use Webclient\Fake\FakeHttpClient;
+use Webclient\Fake\Handler\SpecHandler\SpecHandlerBuilder;
+use Webclient\Fake\Handler\SpecHandler\Rule;
+
+$builder = SpecHandlerBuilder::create();
+
+$builder
+    ->route(function (Rule $rule) {
+        $rule->notEqual('header.authorization', 'bearer xxx');
+        $rule->oneOf(function (Rule $rule) {
+            $rule->allOf(function (Rule $rule) {
+                $rule->equal('uri.path', '/api/v1/posts');
+                $rule->equal('method', 'POST');
+            });
+            $rule->allOf(function (Rule $rule) {
+                $rule->match('uri.path', '^/api/v1/posts/([a-zA-Z0-9\-]+)$');
+                $rule->match('method', '^(PUT|DELETE)$');
+            });
+        });
+    })
+    ->response(function (ResponseInterface $response): ResponseInterface {
+        return $response->withStatus(403);
+    });
+
+$handler = $builder->build();
+
+$client = new FakeHttpClient($handler);
+```
+
+## SimpleRoutingHandler
 
 This package provides simple routing.
 
@@ -49,7 +89,7 @@ This package provides simple routing.
 <?php
 
 use Webclient\Fake\FakeHttpClient;
-use Webclient\Fake\Handler\SimpleRoutingHandler;
+use Webclient\Fake\Handler\SimpleRoutingHandler\SimpleRoutingHandler;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 

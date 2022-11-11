@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace Webclient\Fake\Message;
 
 use InvalidArgumentException;
+use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\StreamInterface;
+use Psr\Http\Message\UploadedFileInterface;
 use Psr\Http\Message\UriInterface;
 
 final class ServerRequest implements ServerRequestInterface
@@ -16,48 +18,50 @@ final class ServerRequest implements ServerRequestInterface
     private string $protocolVersion;
     private string $method;
     private string $target;
-    private array $server;
+    private array $serverParams;
     private array $attributes = [];
     private array $query = [];
     private array $cookies = [];
-    private array $files = [];
-    /** @var string[][] */
-    private array $headers = [];
+    private array $files;
 
+    /**
+     * @var array<string, string[]>
+     */
+    private array $headers = [];
 
     /**
      * @var null|array|object
      */
     private $parsedBody;
 
+    /**
+     * @param RequestInterface $request
+     * @param array $serverParams
+     */
     public function __construct(
-        UriInterface $uri,
-        StreamInterface $body,
-        string $protocolVersion,
-        string $method,
-        string $target,
-        array $headers,
-        array $server = []
+        RequestInterface $request,
+        array $serverParams = []
     ) {
-        $this->body = $body;
+        $uri = $request->getUri();
         $this->uri = $uri;
-        $this->protocolVersion = $protocolVersion;
-        $this->method = $method;
-        $this->target = $target;
-        $this->server = $server;
+        $this->protocolVersion = $request->getProtocolVersion();
+        $this->method = $request->getMethod();
+        $body = $request->getBody();
+        $this->target = $request->getRequestTarget();
+        $this->serverParams = $serverParams;
         parse_str($this->uri->getQuery(), $this->query);
-        $this->server['REQUEST_URI'] = $this->uri->__toString();
-        $this->server['QUERY_STRING'] = $this->uri->getQuery();
-        $this->server['REQUEST_METHOD'] = $this->method;
-        $this->server['SERVER_NAME'] = $this->uri->getHost();
-        $this->server['SERVER_PROTOCOL'] = $this->protocolVersion;
+        $this->serverParams['REQUEST_URI'] = $this->uri->__toString();
+        $this->serverParams['QUERY_STRING'] = $this->uri->getQuery();
+        $this->serverParams['REQUEST_METHOD'] = $this->method;
+        $this->serverParams['SERVER_NAME'] = $this->uri->getHost();
+        $this->serverParams['SERVER_PROTOCOL'] = $this->protocolVersion;
         if ($uri->getScheme() === 'https') {
-            $this->server['HTTPS'] = 1;
+            $this->serverParams['HTTPS'] = '1';
         }
         $auth = $uri->getUserInfo();
         $this->headers['Host'] = [$this->uri->getHost()];
-        foreach ($headers as $name => $values) {
-            $name = $this->normalizeHeaderName($name);
+        foreach ($request->getHeaders() as $name => $values) {
+            $name = $this->normalizeHeaderName((string)$name);
             switch ($name) {
                 case 'Cookie':
                     foreach ($values as $value) {
@@ -75,31 +79,28 @@ final class ServerRequest implements ServerRequestInterface
                         $auth = base64_decode($m['auth']);
                     }
                     $this->headers[$name] = $values;
-                    $this->server['HTTP_' . strtoupper(str_replace('-', '_', $name))] = implode(',', $values);
+                    $this->serverParams['HTTP_' . strtoupper(str_replace('-', '_', $name))] = implode(',', $values);
                     break;
                 default:
                     $this->headers[$name] = $values;
-                    $this->server['HTTP_' . strtoupper(str_replace('-', '_', $name))] = implode(',', $values);
+                    $this->serverParams['HTTP_' . strtoupper(str_replace('-', '_', $name))] = implode(',', $values);
                     break;
             }
         }
         if ($auth) {
             $loginPassword = explode(':', $auth, 2);
-            $this->server['PHP_AUTH_USER'] = $loginPassword[0];
+            $this->serverParams['PHP_AUTH_USER'] = $loginPassword[0];
             if (array_key_exists(1, $loginPassword)) {
-                $this->server['PHP_AUTH_PW'] = $loginPassword[1];
+                $this->serverParams['PHP_AUTH_PW'] = $loginPassword[1];
             }
         }
         $contentType = strtolower($this->getHeaderLine('Content-Type'));
-        list($type) = explode(';', $contentType);
-        $contents = (string)$body;
-        if ($type === 'multipart/form-data') {
-            if (preg_match('/boundary="?(?<boundary>.*?)"?$/', $contentType, $matches)) {
-                $this->parseMultipartBody('--' . $matches['boundary'], $contents);
-            }
-        } else {
-            $this->parseBody($type, $contents, true);
-        }
+        $input = $this->parseBody($contentType, $body);
+        $this->parsedBody = empty($input['params']) ? null : $input['params'];
+        $this->headers = array_replace($this->headers, $input['headers']);
+        $this->serverParams['HTTP_CONTENT_TYPE'] = $this->getHeaderLine('Content-Type') ?: 'text/plain';
+        $this->files = $input['files'];
+        $this->body = $input['body'];
     }
 
     /**
@@ -231,7 +232,7 @@ final class ServerRequest implements ServerRequestInterface
     public function withRequestTarget($requestTarget)
     {
         $that = clone $this;
-        $that->target = $requestTarget;
+        $that->target = (string)$requestTarget;
         return $that;
     }
 
@@ -286,7 +287,7 @@ final class ServerRequest implements ServerRequestInterface
      */
     public function getServerParams(): array
     {
-        return $this->server;
+        return $this->serverParams;
     }
 
     /**
@@ -356,9 +357,6 @@ final class ServerRequest implements ServerRequestInterface
      */
     public function withParsedBody($data)
     {
-        if (!is_null($data) && !is_object($data) && !is_array($data)) {
-            throw new InvalidArgumentException('Parsed body value must be an array, an object, or null');
-        }
         $that = clone $this;
         $that->parsedBody = $data;
         return $that;
@@ -407,146 +405,339 @@ final class ServerRequest implements ServerRequestInterface
         return mb_convert_case($name, MB_CASE_TITLE);
     }
 
-    private function parseBody(string $contentType, string $contents, $allowRecursion = false)
+//    private function parseBody(string $contentType, string $contents, bool $allowRecursion = false): void
+//    {
+//        switch ($contentType) {
+//            case 'application/x-www-form-urlencoded':
+//                parse_str($contents, $parsedForm);
+//                $this->parsedBody = $parsedForm;
+//                return;
+//            case 'application/json':
+//                /** @var array|false $parsedJson */
+//                $parsedJson = json_decode($contents, true);
+//                if (is_array($parsedJson)) {
+//                    $this->parsedBody = $parsedJson;
+//                }
+//                return;
+//            default:
+//                if (!$allowRecursion) {
+//                    return;
+//                }
+//                $parts = explode('+', $contentType);
+//                if (count($parts) >= 2) {
+//                    $contentType = 'application/' . $parts[count($parts) - 1];
+//                }
+//                $this->parseBody($contentType, $contents);
+//        }
+//    }
+
+//    private function parseMultipartBody(string $boundary, string $contents): void
+//    {
+//        $parts = array_slice(explode("\r\n$boundary\r\n", explode("\r\n$boundary--\r\n", $contents)[0]), 1);
+//        foreach ($parts as $part) {
+//            $this->parsePart($part);
+//        }
+//        $this->headers['Content-Type'] = ['application/x-www-form-urlencoded'];
+//        $this->server['HTTP_CONTENT_TYPE'] = 'application/x-www-form-urlencoded';
+//        $this->body = new Stream(http_build_query((array)$this->parsedBody));
+//    }
+//
+//    private function parsePart(string $contents): void
+//    {
+//        $data = explode("\r\n\r\n", $contents, 2);
+//        $header = trim($data[0]);
+//        if (!$header || !array_key_exists(1, $data)) {
+//            return;
+//        }
+//        $body = trim($data[1]);
+//        if (!$body) {
+//            return;
+//        }
+//        $headers = [];
+//        foreach (explode("\r\n", $header) as $line) {
+//            $parts = explode(':', $line, 2);
+//            $key = strtolower(trim($parts[0]));
+//            if (!array_key_exists(1, $parts) || !$key) {
+//                continue;
+//            }
+//            $values = array_map('trim', explode(';', $parts[1]));
+//            foreach ($values as $value) {
+//                $parts = explode('=', $value, 2);
+//                $n = trim($parts[0]);
+//                if (!$n) {
+//                    continue;
+//                }
+//                if (array_key_exists(1, $parts)) {
+//                    $headers[$key]['attr'][$n] = ltrim(rtrim(trim($parts[1]), '"'), '"');
+//                } else {
+//                    $headers[$key]['values'][] = $n;
+//                }
+//                if (!array_key_exists('attr', $headers[$key])) {
+//                    $headers[$key]['attr'] = [];
+//                }
+//                if (!array_key_exists('values', $headers[$key])) {
+//                    $headers[$key]['values'] = [];
+//                }
+//            }
+//        }
+//        if (
+//            !array_key_exists('content-disposition', $headers)
+//            || !array_key_exists('attr', $headers['content-disposition'])
+//            || !array_key_exists('name', $headers['content-disposition']['attr'])
+//            || !$headers['content-disposition']['attr']['name']
+//        ) {
+//            return;
+//        }
+//        $disposition = $headers['content-disposition'];
+//        $name = $disposition['attr']['name'];
+//        $filename = array_key_exists('filename', $disposition['attr']) ? $disposition['attr']['filename'] : null;
+//        if (is_null($filename)) {
+//            if (is_null($this->parsedBody)) {
+//                $this->parsedBody = [];
+//            }
+//            if (is_array($this->parsedBody)) {
+//                $this->setField($this->parsedBody, $name, $body);
+//            }
+//            return;
+//        }
+//        $mime = 'application/octet-stream';
+//        if (
+//            array_key_exists('content-type', $headers)
+//            && array_key_exists('values', $headers['content-type'])
+//            && array_key_exists(0, $headers['content-type']['values'])
+//        ) {
+//            $mime = $headers['content-type']['values'][0];
+//        }
+//        $file = $this->parseFile($filename, $mime, $body);
+//        $this->setField($this->files, $name, $file);
+//    }
+//
+//    private function parseFile(string $filename, string $contentType, string $contents): UploadedFile
+//    {
+//        $error = UPLOAD_ERR_OK;
+//        if (!$contents && $filename === '') {
+//            $error = UPLOAD_ERR_NO_FILE;
+//        }
+//        return new UploadedFile($filename, $contents, $contentType, $error);
+//    }
+
+    /**
+     * @param array $bag
+     * @param string $field
+     * @param mixed $value
+     * @return void
+     */
+//    private function setField(array &$bag, string $field, $value): void
+//    {
+//        $parts = explode('[', str_replace(']', '', $field));
+//        if (count($parts) == 1) {
+//            $bag[$field] = $value;
+//            return;
+//        }
+//        $key = $parts[0];
+//        $target = &$bag;
+//        for ($i = 1; array_key_exists($i, $parts); $i++) {
+//            $prev = $key;
+//
+//            if ($prev === '') {
+//                $target[] = [];
+//                end($target);
+//                $target = &$target[key($target)];
+//            } else {
+//                if (!isset($target[$prev]) || !is_array($target[$prev])) {
+//                    $target[$prev] = [];
+//                }
+//                $target = &$target[$prev];
+//            }
+//            $key = $parts[$i];
+//        }
+//        if ($key === '') {
+//            $target[] = $value;
+//        } else {
+//            $target[$key] = $value;
+//        }
+//    }
+
+    /**
+     * @param string $contentType
+     * @param StreamInterface $body
+     * @return array{params: array, files: array, headers: array<string, string[]>, body: StreamInterface}
+     */
+    private function parseBody(string $contentType, StreamInterface $body): array
     {
-        $parsedBody = null;
+        $result = [
+            'params' => [],
+            'files' => [],
+            'headers' => [],
+            'body' => $body,
+        ];
+
+        $type = explode(';', $contentType)[0];
+        preg_match('/boundary="?(?<boundary>.*?)"?$/', $contentType, $matches);
+        $contents = (string)$body;
+        if ($type === 'multipart/form-data' && array_key_exists('boundary', $matches)) {
+            $result = array_replace($result, $this->parseMixedBody('--' . $matches['boundary'], $contents));
+            $result['headers']['Content-Type'] = ['application/x-www-form-urlencoded'];
+            $result['body'] = new Stream(http_build_query($result['params']));
+        } else {
+            $result['params'] = $this->parseSimpleBody($contentType, $contents);
+        }
+        return $result;
+    }
+
+    private function parseSimpleBody(string $contentType, string $contents): array
+    {
+        if (!in_array($contentType, ['application/x-www-form-urlencoded', 'application/json'])) {
+            $parts = explode('+', $contentType);
+            if (count($parts) >= 2) {
+                $contentType = 'application/' . $parts[count($parts) - 1];
+            }
+        }
         switch ($contentType) {
             case 'application/x-www-form-urlencoded':
-                $parsedBody = [];
-                parse_str($contents, $parsedBody);
-                break;
+                parse_str($contents, $parsedForm);
+                return $parsedForm;
             case 'application/json':
-                $parsedBody = json_decode($contents, true);
-                break;
-            default:
-                if (!$allowRecursion) {
-                    return;
+                /** @var array|false $parsedJson */
+                $parsedJson = json_decode($contents, true);
+                if (is_array($parsedJson)) {
+                    return $parsedJson;
                 }
-                $parts = explode('+', $contentType);
-                if (count($parts) >= 2) {
-                    $contentType = 'application/' . $parts[count($parts) - 1];
-                }
-                $this->parseBody($contentType, $contents);
-                break;
+                return [];
         }
-        if ($parsedBody) {
-            $this->parsedBody = $parsedBody;
-        }
+        return [];
     }
 
-    private function parseMultipartBody($boundary, $contents)
+    /**
+     * @param string $boundary
+     * @param string $contents
+     * @return array{params: array, files: array}
+     */
+    private function parseMixedBody(string $boundary, string $contents): array
     {
-        $parts = array_slice(explode("\r\n$boundary\r\n", explode("\r\n$boundary--\r\n", $contents)[0]), 1);
+        $parts = array_slice(explode("\r\n$boundary\r\n", explode("\r\n$boundary--\r\n", "\r\n$contents")[0]), 1);
+        $result = [
+            'params' => [],
+            'files' => [],
+        ];
         foreach ($parts as $part) {
-            $this->parsePart($part);
-        }
-        $this->headers['Content-Type'] = ['application/x-www-form-urlencoded'];
-        $this->server['HTTP_CONTENT_TYPE'] = 'application/x-www-form-urlencoded';
-        $this->body = new Stream(http_build_query((array)$this->parsedBody));
-    }
-
-    private function parsePart(string $contents): void
-    {
-        $data = explode("\r\n\r\n", $contents, 2);
-        $header = trim($data[0]);
-        if (!$header || !array_key_exists(1, $data)) {
-            return;
-        }
-        $body = trim($data[1]);
-        if (!$body) {
-            return;
-        }
-        $headers = [];
-        foreach (explode("\r\n", $header) as $line) {
-            $parts = explode(':', $line, 2);
-            $key = strtolower(trim($parts[0]));
-            if (!array_key_exists(1, $parts) || !$key) {
+            $parsedPart = $this->parseMixedPart($part);
+            if (is_null($parsedPart)) {
                 continue;
             }
-            $values = array_map('trim', explode(';', $parts[1]));
-            foreach ($values as $value) {
-                $parts = explode('=', $value, 2);
-                $n = trim($parts[0]);
-                if (!$n) {
+            if (is_string($parsedPart['data'])) {
+                $result['params'] = $this->appendData($result['params'], $parsedPart['field'], $parsedPart['data']);
+                continue;
+            }
+            if ($parsedPart['data'] instanceof UploadedFileInterface) {
+                $result['files'] = $this->appendData($result['files'], $parsedPart['field'], $parsedPart['data']);
+            }
+        }
+        return $result;
+    }
+
+    /**
+     * @param string $contents
+     * @return null|array{field: string, data: string|UploadedFileInterface}
+     */
+    private function parseMixedPart(string $contents): ?array
+    {
+        $data = explode("\r\n\r\n", $contents, 2);
+        $headerString = trim($data[0]);
+        if ($headerString === '' || !array_key_exists(1, $data)) {
+            return null;
+        }
+
+        $body = trim($data[1]);
+
+        /** @var array<string, array{value: string, options: array<string, string>}> $headers */
+        $headers = [];
+        foreach (explode("\r\n", $headerString) as $line) {
+            $headerParts = explode(':', $line, 2);
+            $headerName = strtolower(trim($headerParts[0]));
+            if (!array_key_exists(1, $headerParts) || empty($headerName)) {
+                continue;
+            }
+            $options = array_map('trim', explode(';', $headerParts[1]));
+            $headers[$headerName]['value'] = array_shift($options);
+            $headers[$headerName]['options'] = [];
+            foreach ($options as $option) {
+                $optionParts = explode('=', $option, 2);
+                $optionName = trim($optionParts[0]);
+                if ($optionName === '') {
                     continue;
                 }
-                if (array_key_exists(1, $parts)) {
-                    $headers[$key]['attr'][$n] = ltrim(rtrim(trim($parts[1]), '"'), '"');
-                } else {
-                    $headers[$key]['values'][] = $n;
+                $optionValue = trim($optionParts[1] ?? '');
+                if (substr($optionValue, 0, 1) === '"' && substr($optionValue, -1) === '"') {
+                    $optionValue = substr($optionValue, 1, -1);
                 }
-                if (!array_key_exists('attr', $headers[$key])) {
-                    $headers[$key]['attr'] = [];
-                }
-                if (!array_key_exists('values', $headers[$key])) {
-                    $headers[$key]['values'] = [];
-                }
+                $headers[$headerName]['options'][$optionName] = trim($optionValue);
             }
         }
-        if (
-            !array_key_exists('content-disposition', $headers)
-            || !array_key_exists('name', $headers['content-disposition']['attr'])
-            || !$headers['content-disposition']['attr']['name']
-        ) {
-            return;
-        }
-        $disposition = $headers['content-disposition'];
-        $name = $disposition['attr']['name'];
-        $filename = array_key_exists('filename', $disposition['attr']) ? $disposition['attr']['filename'] : null;
-        if (is_null($filename)) {
-            if (is_null($this->parsedBody)) {
-                $this->parsedBody = [];
-            }
-            if (is_array($this->parsedBody)) {
-                $this->setField($this->parsedBody, $name, $body);
-            }
-            return;
-        }
-        $mime = 'application/octet-stream';
-        if (array_key_exists('content-type', $headers) && array_key_exists(0, $headers['content-type']['values'])) {
-            $mime = $headers['content-type']['values'][0];
-        }
-        $file = $this->parseFile($filename, $mime, $body);
-        $this->setField($this->files, $name, $file);
-    }
 
-    private function parseFile($filename, $contentType, $contents): UploadedFile
-    {
+        $field = $headers['content-disposition']['options']['name'] ?? null;
+        if (is_null($field)) {
+            return null;
+        }
+
+        $filename = $headers['content-disposition']['options']['filename'] ?? null;
+        if (is_null($filename)) {
+            return [
+                'field' => $field,
+                'data' => $body,
+            ];
+        }
+        $mime = $headers['content-type']['value'] ?? 'application/octet-stream';
         $error = UPLOAD_ERR_OK;
-        if (!$contents && $filename === '') {
+        if ($body === '' && $filename === '') {
             $error = UPLOAD_ERR_NO_FILE;
         }
-        return new UploadedFile($filename, $contents, $contentType, $error);
+
+        return [
+            'field' => $field,
+            'data' => new UploadedFile($filename, $body, $mime, $error),
+        ];
     }
 
-    private function setField(array &$bag, string $field, $value)
+    /**
+     * @param array $array
+     * @param string $field
+     * @param string|UploadedFileInterface $data
+     * @return array
+     */
+    private function appendData(array $array, string $field, $data): array
     {
-        $parts = explode('[', str_replace(']', '', $field));
-        if (count($parts) == 1) {
-            $bag[$field] = $value;
-            return;
+        $path = explode('[', $field, 2);
+        $current = $path[0];
+        $left = $path[1] ?? null;
+        if (is_string($left) && substr($left, -1) !== ']') {
+            $left = null;
         }
-        $key = $parts[0];
-        $target = &$bag;
-        for ($i = 1; array_key_exists($i, $parts); $i++) {
-            $prev = $key;
 
-            if ($prev === '') {
-                $target[] = [];
-                end($target);
-                $target = &$target[key($target)];
+        if (is_null($left)) {
+            if ($current === '') {
+                $array[] = $data;
             } else {
-                if (!isset($target[$prev]) || !is_array($target[$prev])) {
-                    $target[$prev] = [];
-                }
-                $target = &$target[$prev];
+                $array[$current] = $data;
             }
-            $key = $parts[$i];
+            return $array;
         }
-        if ($key === '') {
-            $target[] = $value;
+
+        $parts = explode('][', substr($left, 0, -1));
+        $next = array_shift($parts);
+        if (!empty($parts)) {
+            $next .= '[' . implode('][', $parts) . ']';
+        }
+
+        if ($current === '') {
+            $array[] = $this->appendData([], $next, $data);
         } else {
-            $target[$key] = $value;
+            $array[$current] = $this->appendData(
+                (array_key_exists($current, $array) && is_array($array[$current])) ? $array[$current] : [],
+                $next,
+                $data
+            );
         }
+        return $array;
     }
 }

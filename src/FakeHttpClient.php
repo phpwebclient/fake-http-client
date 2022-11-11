@@ -19,12 +19,12 @@ final class FakeHttpClient implements ClientInterface
     public const NO_REPLACE_ATTRIBUTE = 'webclient-fake-http-client-request-no-replace';
 
     private RequestHandlerInterface $handler;
-    private array $server;
+    private array $serverParams;
 
-    public function __construct(RequestHandlerInterface $handler, array $server = [])
+    public function __construct(RequestHandlerInterface $handler, array $serverParams = [])
     {
         $this->handler = $handler;
-        $this->server = $server;
+        $this->serverParams = $serverParams;
     }
 
     /**
@@ -36,13 +36,8 @@ final class FakeHttpClient implements ClientInterface
             $serverRequest = $request;
         } else {
             $serverRequest = new ServerRequest(
-                $request->getUri(),
-                $request->getBody(),
-                $request->getProtocolVersion(),
-                $request->getMethod(),
-                $request->getRequestTarget(),
-                $request->getHeaders(),
-                $this->server
+                $request,
+                $this->serverParams
             );
         }
         $serverRequest->getBody()->rewind();

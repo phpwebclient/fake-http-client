@@ -9,7 +9,7 @@ use Psr\Http\Client\NetworkExceptionInterface;
 use Psr\Http\Message\RequestInterface;
 use Throwable;
 
-class NetworkError extends Exception implements NetworkExceptionInterface
+final class NetworkError extends Exception implements NetworkExceptionInterface
 {
     private RequestInterface $request;
 

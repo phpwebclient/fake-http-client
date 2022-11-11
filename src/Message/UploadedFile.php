@@ -33,7 +33,7 @@ final class UploadedFile implements UploadedFileInterface
         return $this->body;
     }
 
-    public function moveTo($targetPath)
+    public function moveTo($targetPath): void
     {
         if ($this->moved) {
             throw new RuntimeException('Uploaded file ' . $this->name . ' has already been moved');

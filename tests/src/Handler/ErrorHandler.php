@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Webclient\Stuff\Fake\Handler;
+namespace Tests\Webclient\Fake\Tools\Handler;
 
 use Exception;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 
-class ErrorHandler implements RequestHandlerInterface
+final class ErrorHandler implements RequestHandlerInterface
 {
     /**
      * @param ServerRequestInterface $request

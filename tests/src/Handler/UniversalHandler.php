@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Webclient\Stuff\Fake\Handler;
+namespace Tests\Webclient\Fake\Tools\Handler;
 
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
@@ -10,7 +10,7 @@ use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\UploadedFileInterface;
 use Psr\Http\Server\RequestHandlerInterface;
 
-class UniversalHandler implements RequestHandlerInterface
+final class UniversalHandler implements RequestHandlerInterface
 {
     private ResponseFactoryInterface $responseFactory;
 

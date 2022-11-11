@@ -15,7 +15,7 @@ final class Stream implements StreamInterface
      */
     private $stream;
 
-    public function __construct(string $content)
+    public function __construct(string $content = '')
     {
         $this->stream = fopen('php://temp', 'w+');
         fwrite($this->stream, $content);
@@ -34,15 +34,15 @@ final class Stream implements StreamInterface
 
     public function close()
     {
-        if ($this->stream) {
-            fclose($this->stream);
+        $stream = $this->stream;
+        $this->stream = null;
+        if (is_resource($stream)) {
+            fclose($stream);
         }
-        $this->detach();
     }
 
     /**
      * @inheritDoc
-     * @return resource
      */
     public function detach()
     {
@@ -75,14 +75,14 @@ final class Stream implements StreamInterface
         return is_resource($this->stream);
     }
 
-    public function seek($offset, $whence = SEEK_SET)
+    public function seek($offset, $whence = SEEK_SET): void
     {
         if ($this->stream && fseek($this->stream, $offset, $whence) === -1) {
             throw new RuntimeException('Could not seek in stream.');
         }
     }
 
-    public function rewind()
+    public function rewind(): void
     {
         if ($this->stream && rewind($this->stream) === false) {
             throw new RuntimeException('Could not rewind stream.');
@@ -108,10 +108,13 @@ final class Stream implements StreamInterface
         return is_resource($this->stream);
     }
 
-    public function read($length)
+    /**
+     * @inheritDoc
+     */
+    public function read($length): string
     {
         if (!$this->stream) {
-            return false;
+            throw new RuntimeException('Could not read from stream.');
         }
         $data = fread($this->stream, $length);
 
